@@ -36,3 +36,11 @@ Production build:
 ```bash
 npm run build
 ```
+
+## GitHub Pages
+
+Repository-ის სახელი უნდა იყოს `ss`. ატვირთვის შემდეგ გახსენით:
+
+`Settings -> Pages -> Build and deployment -> Source -> GitHub Actions`
+
+შემდეგ ყოველი `main` branch-ზე push ავტომატურად ააწყობს აპს და გამოაქვეყნებს GitHub Pages-ზე.

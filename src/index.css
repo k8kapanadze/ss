@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@theme inline {
+  --font-sans: "Noto Sans Georgian", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Cold slate blue transitioning to grey style */
+  --color-teal-50: var(--teal-50);
+  --color-teal-100: var(--teal-100);
+  --color-teal-200: var(--teal-200);
+  --color-teal-400: var(--teal-400);
+  --color-teal-500: var(--teal-500);
+  --color-teal-55: var(--teal-500);
+  --color-teal-600: var(--teal-600);
+  --color-teal-650: var(--teal-650);
+  --color-teal-700: var(--teal-700);
+  --color-teal-900: var(--teal-900);
+  --color-teal-950: var(--teal-950);
+
+  /* Deep burgundy/wine-red style */
+  --color-amber-50: var(--amber-50);
+  --color-amber-100: var(--amber-100);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
+  --color-amber-600: var(--amber-600);
+  --color-amber-700: var(--amber-700);
+  --color-amber-900: var(--amber-900);
+  --color-amber-950: var(--amber-950);
+}
+
+/* Light: clean clinical white with deep teal accent */
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.99 0.005 250);
+  --foreground: oklch(0.18 0.03 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.03 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.03 250);
+  --primary: oklch(0.51 0.19 250);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.01 250);
+  --secondary-foreground: oklch(0.25 0.03 250);
+  --muted: oklch(0.96 0.01 250);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.94 0.02 250);
+  --accent-foreground: oklch(0.25 0.05 250);
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.62 0.08 250);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.75 0.16 75);
+  --warning-foreground: oklch(0.2 0.05 75);
+  --border: oklch(0.92 0.01 250);
+  --input: oklch(0.92 0.01 250);
+  --ring: oklch(0.51 0.19 250);
+  --sidebar: oklch(0.98 0.005 250);
+  --sidebar-foreground: oklch(0.18 0.03 250);
+  --sidebar-primary: oklch(0.51 0.19 250);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.94 0.02 250);
+  --sidebar-accent-foreground: oklch(0.25 0.05 250);
+  --sidebar-border: oklch(0.92 0.01 250);
+  --sidebar-ring: oklch(0.51 0.19 250);
+
+  /* Cold slate blue transitioning to grey */
+  --teal-50: oklch(0.97 0.02 250);
+  --teal-100: oklch(0.92 0.04 250);
+  --teal-200: oklch(0.85 0.08 250);
+  --teal-400: oklch(0.64 0.15 250);
+  --teal-500: oklch(0.51 0.19 250);
+  --teal-600: oklch(0.44 0.19 250);
+  --teal-650: oklch(0.38 0.18 250);
+  --teal-700: oklch(0.32 0.16 250);
+  --teal-900: oklch(0.20 0.10 250);
+  --teal-950: oklch(0.12 0.06 250);
+
+  /* Deep burgundy/wine-red */
+  --amber-50: oklch(0.97 0.015 15);
+  --amber-100: oklch(0.93 0.025 15);
+  --amber-400: oklch(0.65 0.12 15);
+  --amber-500: oklch(0.45 0.14 15);
+  --amber-600: oklch(0.38 0.14 15);
+  --amber-700: oklch(0.32 0.12 15);
+  --amber-900: oklch(0.22 0.09 15);
+  --amber-950: oklch(0.14 0.06 15);
+}
+
+/* Dark: deep midnight clinical with electric cyan */
+.dark {
+  --background: oklch(0.15 0.02 250);
+  --foreground: oklch(0.96 0.01 250);
+  --card: oklch(0.20 0.03 250);
+  --card-foreground: oklch(0.96 0.01 250);
+  --popover: oklch(0.20 0.03 250);
+  --popover-foreground: oklch(0.96 0.01 250);
+  --primary: oklch(0.60 0.16 250);
+  --primary-foreground: oklch(0.12 0.04 250);
+  --secondary: oklch(0.25 0.03 250);
+  --secondary-foreground: oklch(0.96 0.01 250);
+  --muted: oklch(0.22 0.025 250);
+  --muted-foreground: oklch(0.68 0.02 250);
+  --accent: oklch(0.28 0.06 250);
+  --accent-foreground: oklch(0.92 0.05 250);
+  --destructive: oklch(0.62 0.22 22);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.72 0.08 250);
+  --success-foreground: oklch(0.12 0.04 250);
+  --warning: oklch(0.8 0.17 75);
+  --warning-foreground: oklch(0.18 0.05 75);
+  --border: oklch(0.26 0.03 250);
+  --input: oklch(0.26 0.03 250);
+  --ring: oklch(0.60 0.16 250);
+  --sidebar: oklch(0.18 0.03 250);
+  --sidebar-foreground: oklch(0.96 0.01 250);
+  --sidebar-primary: oklch(0.60 0.16 250);
+  --sidebar-primary-foreground: oklch(0.12 0.04 250);
+  --sidebar-accent: oklch(0.25 0.03 250);
+  --sidebar-accent-foreground: oklch(0.96 0.01 250);
+  --sidebar-border: oklch(0.26 0.03 250);
+  --sidebar-ring: oklch(0.60 0.16 250);
+
+  /* Cold slate blue transitioning to grey */
+  --teal-50: oklch(0.16 0.04 250);
+  --teal-100: oklch(0.22 0.06 250);
+  --teal-200: oklch(0.28 0.08 250);
+  --teal-400: oklch(0.68 0.15 250);
+  --teal-500: oklch(0.58 0.17 250);
+  --teal-600: oklch(0.50 0.16 250);
+  --teal-650: oklch(0.44 0.14 250);
+  --teal-700: oklch(0.38 0.12 250);
+  --teal-900: oklch(0.22 0.07 250);
+  --teal-950: oklch(0.12 0.04 250);
+
+  /* Deep burgundy/wine-red */
+  --amber-50: oklch(0.18 0.03 15);
+  --amber-100: oklch(0.24 0.05 15);
+  --amber-400: oklch(0.75 0.12 15);
+  --amber-500: oklch(0.66 0.13 15);
+  --amber-600: oklch(0.58 0.13 15);
+  --amber-700: oklch(0.48 0.12 15);
+  --amber-900: oklch(0.26 0.08 15);
+  --amber-950: oklch(0.15 0.04 15);
+}
+
+@layer base {
+  *, ::after, ::before {
+    border-color: var(--color-border);
+  }
+  html {
+    font-family: var(--font-sans);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Inline theme toggle helper */
+  .theme-transition,
+  .theme-transition * {
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease,
+      color 200ms ease;
+  }
+}
+
+@layer utilities {
+  .grain {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      color-mix(in oklab, var(--color-foreground) 4%, transparent) 1px,
+      transparent 0
+    );
+    background-size: 20px 20px;
+  }
+  .glow-primary {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--color-primary) 20%, transparent),
+      0 10px 40px -10px color-mix(in oklab, var(--color-primary) 50%, transparent);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Retaining necessary structural layout animations helper */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}

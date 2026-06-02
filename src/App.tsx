@@ -65,18 +65,8 @@ export default function App() {
   const [activePool, setActivePool] = useState<PlayableQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
-  const activeFiles = useMemo(() => {
-    if (chosenMode === 'residents') {
-      return [
-        {
-          name: 'სამკურნალო_რეზიდენტურა.txt',
-          questions: RESIDENTS_QUESTIONS,
-          sizeStr: '1.2 MB'
-        }
-      ];
-    }
-    return files;
-  }, [chosenMode, files]);
+  // activeFiles is ONLY for practice/simulator modes — never includes residents data
+  const activeFiles = useMemo(() => files, [files]);
 
   // Active UI Navigation Tab
   // 'all' = Main Test Config, 'simulation' = Multi-file Simulator, 'history' = My Mistakes Collections
@@ -1189,7 +1179,8 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* List of active prepared bases with integrated collapsers */}
+                  {/* List of active prepared bases with integrated collapsers — hidden in residents mode */}
+                  {chosenMode !== 'residents' && (
                   <AnimatePresence mode="popLayout">
                     {activeFiles.length > 0 && (
                       <motion.div
@@ -1535,6 +1526,7 @@ export default function App() {
 
                   {/* Purged old form properties block */}
                   <div className="hidden" />
+                  )}
                 </div>
               )}
 

@@ -67,13 +67,11 @@ export default function App() {
 
   const activeFiles = useMemo(() => {
     if (chosenMode === 'residents') {
-      const stored = localStorage.getItem('residents_stored_questions');
-      const questionsList = stored ? JSON.parse(stored) : RESIDENTS_QUESTIONS;
       return [
         {
-          name: 'რეზიდენტების ბაზა.txt',
-          questions: questionsList,
-          sizeStr: stored ? `${(stored.length / 1024).toFixed(1)} KB` : '25.3 KB'
+          name: 'სამკურნალო_რეზიდენტურა.txt',
+          questions: RESIDENTS_QUESTIONS,
+          sizeStr: '1.2 MB'
         }
       ];
     }
@@ -376,13 +374,10 @@ export default function App() {
   };
 
   const handleStartResidentsDirectly = () => {
-    const stored = localStorage.getItem('residents_stored_questions');
-    const questionsList = stored ? JSON.parse(stored) : RESIDENTS_QUESTIONS;
-
     const targetFile = {
-      name: 'რეზიდენტების ბაზა.txt',
-      questions: questionsList,
-      sizeStr: '25.3 KB'
+      name: 'სამკურნალო_რეზიდენტურა.txt',
+      questions: RESIDENTS_QUESTIONS,
+      sizeStr: '1.2 MB'
     };
 
     setActiveCategoryFilter(null);
@@ -1163,67 +1158,34 @@ export default function App() {
                             <Award className="h-6 w-6 text-yellow-500 animate-pulse" />
                           </div>
                           <div>
-                            <h3 className="text-base font-black text-slate-900 dark:text-white">რეზიდენტურის ოფიციალური ბაზა</h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">კითხვების ჯამური რაოდენობა: <span className="font-extrabold text-slate-900 dark:text-white font-mono">{activeFiles[0].questions.length}</span></p>
+                            <h3 className="text-base font-black text-slate-900 dark:text-white">სამკურნალო რეზიდენტურის ბაზა</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">კითხვების ჯამური რაოდენობა: <span className="font-extrabold text-slate-900 dark:text-white font-mono">{RESIDENTS_QUESTIONS.length}</span></p>
                           </div>
                         </div>
-                        <span className="text-[10px] font-black uppercase text-slate-900 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 h-fit">
-                          {localStorage.getItem('residents_stored_questions') ? 'ჩატვირთულია სრული ბაზა ☑️' : 'ჩაშენებულია საცდელი ბაზა ⚠️'}
+                        <span className="text-[10px] font-black uppercase text-slate-900 dark:text-slate-200 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 h-fit">
+                          სრული ბაზა ჩაშენებულია ✅
                         </span>
                       </div>
 
-                      {/* Text paste area for easy import of all 2744 questions */}
-                      <div className="space-y-4">
-                        <label className="text-xs font-bold text-slate-600 dark:text-slate-350 block">ბაზის იმპორტი / ტექსტის ჩასმა (2744 კითხვა):</label>
-                        <textarea
-                          placeholder="///// ჩასვით თქვენი სრული ტექსტური ბაზა აქ...&#10;//// კითხვა...&#10;// ️ სწორი პასუხი...&#10;/// არასწორი...&#10;/// არასწორი..."
-                          className="w-full h-40 p-4 rounded-2xl bg-white dark:bg-[#161B22] border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-slate-900 dark:focus:ring-white focus:outline-none transition-all resize-none pointer-events-auto"
-                          onChange={(e) => setResidentsRawInput(e.target.value)}
-                          value={residentsRawInput}
-                        />
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                          <button
-                            onClick={handleImportResidentsPasted}
-                            className="bg-slate-900 hover:bg-slate-950 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-black font-extrabold text-xs px-5 py-3 rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-98 focus:outline-none"
-                          >
-                            <RefreshCw className="h-4 w-4 shrink-0" />
-                            <span>ბაზის განახლება / იმპორტი</span>
-                          </button>
-
-                          {localStorage.getItem('residents_stored_questions') && (
-                            <button
-                              onClick={() => {
-                                localStorage.removeItem('residents_stored_questions');
-                                setResidentsRawInput('');
-                                // Trigger state refresh
-                                setFiles([...files]);
-                                alert('სრული ბაზა წაიშალა. აღდგენილია საწყისი საცდელი ბაზა.');
-                              }}
-                              className="text-xs font-extrabold text-rose-600 hover:text-rose-500 py-2.5 px-4 hover:bg-rose-500/5 rounded-xl cursor-pointer transition-all focus:outline-none"
-                            >
-                              საწყისის აღდგენა
-                            </button>
-                          )}
+                      {/* Embedded base info */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 text-center">
+                          <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">{RESIDENTS_QUESTIONS.length}</p>
+                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mt-1">სულ კითხვა</p>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 text-center">
+                          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">100%</p>
+                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mt-1">ხელმისაწვდომი</p>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 text-center">
+                          <p className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono">v2</p>
+                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mt-1">ბაზის ვერსია</p>
                         </div>
                       </div>
 
-                      {/* We also let them drag & drop the txt file directly here! */}
-                      <div className="border-t border-slate-200/60 dark:border-slate-800/80 pt-6 space-y-3">
-                        <p className="text-xs font-bold text-slate-600 dark:text-slate-350">ან ჩააგდეთ რეზიდენტურის ბაზის .TXT ფაილი აქ:</p>
-                        <UploadSection
-                          files={[]}
-                          onFilesChanged={(newFiles) => {
-                            if (newFiles.length > 0) {
-                              const uploadedFile = newFiles[0];
-                              const serializedQuestions = JSON.stringify(uploadedFile.questions);
-                              localStorage.setItem('residents_stored_questions', serializedQuestions);
-                              // Trigger state update
-                              setFiles([...files]);
-                              alert(`წარმატებით ჩაიტვირთა ${uploadedFile.questions.length} კითხვა ფაილიდან "${uploadedFile.name}"!`);
-                            }
-                          }}
-                        />
-                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-500 text-center">
+                        ბაზა ჩაშენებულია კოდში — ინტერნეტის გარეშეც სრულად მუშაობს.
+                      </p>
                     </div>
                   )}
 

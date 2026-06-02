@@ -139,20 +139,9 @@ export default function UploadSection({ files, onFilesChanged }: UploadSectionPr
               <h3 className="text-sm font-extrabold text-[#0f172a] dark:text-slate-100 tracking-tight">
                 საგამოცდო კითხვების ფაილის ატვირთვა
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                ჩააგდეთ ტექსტური ფაილი აქ ან <span className="text-teal-600 dark:text-teal-400 font-extrabold hover:underline">აირჩიეთ ფაილი</span> <span className="font-mono bg-slate-200/40 dark:bg-slate-800/40 text-[10px] px-1.5 py-0.5 rounded ml-1 border border-slate-200 dark:border-slate-800 font-extrabold">.TXT / .JSON</span>
+              <p className="text-xs text-teal-600 dark:text-teal-400 font-extrabold hover:underline leading-relaxed">
+                აირჩიეთ ფაილი .txt.
               </p>
-              <div className="pt-2 flex items-center justify-center gap-4 text-[10px] font-sans font-bold text-[#64748b] dark:text-[#8b949e]">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                  მრავალფაილიანი მხარდაჭერა
-                </span>
-                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  ავტომატური პარსინგი
-                </span>
-              </div>
             </div>
           </div>
         </div>

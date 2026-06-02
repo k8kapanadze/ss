@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 import { RawQuestion, PlayableQuestion, MistakeCollection, ActiveSession, FileData } from './types';
-import { prepareSessionQuestions, serializeToCustomFormat } from './utils';
+import { prepareSessionQuestions, serializeToCustomFormat, parseQuestionFile, getQuestionCategory } from './utils';
 
 import ThemeToggle from './components/ThemeToggle';
 import UploadSection from './components/UploadSection';
@@ -37,6 +37,7 @@ import SimulationSetup from './components/SimulationSetup';
 import MistakesHistory from './components/MistakesHistory';
 import QuestionCard from './components/QuestionCard';
 import ResultsView from './components/ResultsView';
+import { RESIDENTS_QUESTIONS } from './data/residents_questions';
 
 export default function App() {
   // Global persistence states
@@ -55,8 +56,29 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Chosen mode: practice = Standalone Practice, simulator = Exam Simulator
-  const [chosenMode, setChosenMode] = useState<'practice' | 'simulator' | null>(null);
+  // Chosen mode: practice = Standalone Practice, simulator = Exam Simulator, residents = Residents Base Testing
+  const [chosenMode, setChosenMode] = useState<'practice' | 'simulator' | 'residents' | null>(null);
+  const [residentsRawInput, setResidentsRawInput] = useState('');
+
+  // Architectural State Management additions for robust isolated activePool and sourceQuestions
+  const [sourceQuestions, setSourceQuestions] = useState<RawQuestion[]>([]);
+  const [activePool, setActivePool] = useState<PlayableQuestion[]>([]);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+  const activeFiles = useMemo(() => {
+    if (chosenMode === 'residents') {
+      const stored = localStorage.getItem('residents_stored_questions');
+      const questionsList = stored ? JSON.parse(stored) : RESIDENTS_QUESTIONS;
+      return [
+        {
+          name: 'რეზიდენტების ბაზა.txt',
+          questions: questionsList,
+          sizeStr: stored ? `${(stored.length / 1024).toFixed(1)} KB` : '25.3 KB'
+        }
+      ];
+    }
+    return files;
+  }, [chosenMode, files]);
 
   // Active UI Navigation Tab
   // 'all' = Main Test Config, 'simulation' = Multi-file Simulator, 'history' = My Mistakes Collections
@@ -69,7 +91,7 @@ export default function App() {
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
   const [sessionDurationSecs, setSessionDurationSecs] = useState<number>(0);
 
-  const timerActive = session !== null && session.currentIndex < session.questions.length;
+  const timerActive = session !== null && currentIndex < activePool.length;
 
   useEffect(() => {
     if (!timerActive) return;
@@ -126,6 +148,57 @@ export default function App() {
   // Show active session top-right settings dropdown
   const [showSessionSettings, setShowSessionSettings] = useState<boolean>(false);
 
+  // Active Category Filter within the Table of Contents Menu (სარჩევი)
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
+
+  const handleFilterActiveSessionByCategory = (category: string | null) => {
+    setActiveCategoryFilter(category);
+    if (!session) return;
+    
+    let pool = [...sourceQuestions];
+    if (category) {
+      pool = pool.filter((q) => getQuestionCategory(q.text) === category);
+    }
+    
+    if (pool.length === 0) {
+      alert('ამ კატეგორიაში კითხვები არ მოიძებნა!');
+      return;
+    }
+
+    // Apply any active ranges/cuts to this pool as well.
+    let slicedPool = [...pool];
+    const totalCount = slicedPool.length;
+    if (rangeStart || rangeEnd) {
+      const s = parseInt(rangeStart) || 1;
+      const e = parseInt(rangeEnd) || totalCount;
+      const validS = Math.max(1, Math.min(s, totalCount));
+      const validE = Math.max(validS, Math.min(e, totalCount));
+      slicedPool = slicedPool.slice(validS - 1, validE);
+    }
+    if (cutStart && cutEnd) {
+      const cutS = parseInt(cutStart) || 0;
+      const cutE = parseInt(cutEnd) || 0;
+      if (cutS > 0 && cutE >= cutS) {
+        slicedPool = slicedPool.filter(q => q.originalIndex < cutS || q.originalIndex > cutE);
+      }
+    }
+    
+    // Prepare session questions
+    const playable = prepareSessionQuestions(slicedPool, shuffleQuestions, shuffleOptions);
+    
+    setActivePool(playable);
+    setCurrentIndex(0);
+
+    setSession({
+      ...session,
+      questions: playable,
+      currentIndex: 0,
+      answers: {}, // Reset answers for the new isolated test
+    });
+    setSelectedAnswer(null);
+    setIsCorrect(null);
+  };
+
   // Dynamic on-the-fly parameters adjustment during active test
   const handleUpdateActiveSessionParamsOnTheFly = (
     newShuffleQ: boolean,
@@ -136,6 +209,12 @@ export default function App() {
     newCutS: string,
     newCutE: string
   ) => {
+    const rangeSChanged = rangeStart !== newRangeS;
+    const rangeEChanged = rangeEnd !== newRangeE;
+    const cutSChanged = cutStart !== newCutS;
+    const cutEChanged = cutEnd !== newCutE;
+    const isRangeOrCutChanged = rangeSChanged || rangeEChanged || cutSChanged || cutEChanged;
+
     // Keep parameters in sync
     setShuffleQuestions(newShuffleQ);
     setShuffleOptions(newShuffleO);
@@ -147,19 +226,12 @@ export default function App() {
 
     if (!session) return;
 
-    const currentQ = session.questions[session.currentIndex];
+    // Find the original questions pool representing this session (sourceQuestions)
+    let pool = [...sourceQuestions];
 
-    // Find the original questions pool representing this session
-    let pool: RawQuestion[] = [];
-    if (session.type === 'simulation' || session.type === 'mistakes_only' || session.type === 'mistakes_interim' || session.type === 'flagged_only') {
-      pool = [...session.originalQuestions];
-    } else {
-      const sourceFile = files.find(f => session.sourceFiles.includes(f.name));
-      if (sourceFile) {
-        pool = [...sourceFile.questions];
-      } else {
-        pool = [...session.originalQuestions];
-      }
+    // In residents mode, also filter by activeCategoryFilter
+    if (chosenMode === 'residents' && activeCategoryFilter) {
+      pool = pool.filter((q) => getQuestionCategory(q.text) === activeCategoryFilter);
     }
 
     const totalCount = pool.length;
@@ -190,13 +262,41 @@ export default function App() {
     // Prepare playable scrambled questions
     const playable = prepareSessionQuestions(pool, newShuffleQ, newShuffleO);
 
-    // Keep the exact same question ordinal index (e.g. stay on question #5 / index 4)
-    const newIdx = Math.min(session.currentIndex, playable.length - 1);
+    let newIdx = currentIndex;
+    let newAnswers = session.answers;
+
+    if (isRangeOrCutChanged) {
+      // ყოველი დიაპაზონის შეცვლისას, currentIndex ჩამოყარე ნულზე
+      newIdx = 0;
+      newAnswers = {};
+      setSelectedAnswer(null);
+      setIsCorrect(null);
+    } else {
+      // Just option or question shuffle switched: stay on the same index safely
+      newIdx = Math.min(currentIndex, playable.length - 1);
+      newIdx = Math.max(0, newIdx);
+
+      // Keep answer status in sync
+      if (playable[newIdx]) {
+        const ans = session.answers[playable[newIdx].id];
+        if (ans) {
+          setSelectedAnswer(ans.selected);
+          setIsCorrect(ans.isCorrect);
+        } else {
+          setSelectedAnswer(null);
+          setIsCorrect(null);
+        }
+      }
+    }
+
+    setActivePool(playable);
+    setCurrentIndex(newIdx);
 
     setSession({
       ...session,
       questions: playable,
-      currentIndex: Math.max(0, newIdx),
+      currentIndex: newIdx,
+      answers: newAnswers,
     });
   };
 
@@ -233,10 +333,10 @@ export default function App() {
 
   // Sync selected file fallback when files list is modified
   useEffect(() => {
-    if (files.length > 0 && (!selectedFileName || !files.some(f => f.name === selectedFileName))) {
-      setSelectedFileName(files[0].name);
+    if (activeFiles.length > 0 && (!selectedFileName || !activeFiles.some(f => f.name === selectedFileName))) {
+      setSelectedFileName(activeFiles[0].name);
     }
-  }, [files, selectedFileName]);
+  }, [activeFiles, selectedFileName]);
 
   // Auto-expand last added file config when files count increases
   const prevFilesLengthRef = React.useRef(files.length);
@@ -253,8 +353,8 @@ export default function App() {
 
   // Derived current loaded file data
   const currentFile = useMemo(() => {
-    return files.find((f) => f.name === selectedFileName) || null;
-  }, [files, selectedFileName]);
+    return activeFiles.find((f) => f.name === selectedFileName) || null;
+  }, [activeFiles, selectedFileName]);
 
   // Toggle flags
   const handleToggleFlag = (id: string) => {
@@ -275,15 +375,67 @@ export default function App() {
     if (selectedFileName === fileName) setSelectedFileName('');
   };
 
+  const handleStartResidentsDirectly = () => {
+    const stored = localStorage.getItem('residents_stored_questions');
+    const questionsList = stored ? JSON.parse(stored) : RESIDENTS_QUESTIONS;
+
+    const targetFile = {
+      name: 'რეზიდენტების ბაზა.txt',
+      questions: questionsList,
+      sizeStr: '25.3 KB'
+    };
+
+    setActiveCategoryFilter(null);
+    setSourceQuestions(targetFile.questions);
+
+    const playable = prepareSessionQuestions(targetFile.questions, false, false);
+    setActivePool(playable);
+    setCurrentIndex(0);
+
+    setChosenMode('residents');
+    setSession({
+      type: 'main',
+      sourceFiles: [targetFile.name],
+      originalQuestions: targetFile.questions,
+      questions: playable,
+      currentIndex: 0,
+      answers: {},
+    });
+    setSessionDurationSecs(0);
+    setElapsedTime('00:00:00');
+    setSelectedAnswer(null);
+    setIsCorrect(null);
+  };
+
+  const handleImportResidentsPasted = () => {
+    if (!residentsRawInput.trim()) {
+      alert('გთხოვთ, ჯერ ჩაწეროთ ან ჩასვათ ტექსტი.');
+      return;
+    }
+    const parsed = parseQuestionFile(residentsRawInput, 'რეზიდენტების ბაზა.txt');
+    if (parsed.length === 0) {
+      alert('ტექსტიდან კითხვების პარსვა ვერ მოხერხდა. გთხოვთ შეამოწმოთ ფორმატი (////, //, ///).');
+      return;
+    }
+    localStorage.setItem('residents_stored_questions', JSON.stringify(parsed));
+    setResidentsRawInput('');
+    // Trigger React render
+    setFiles([...files]);
+    alert(`წარმატებით ჩაიტვირთა ${parsed.length} კითხვა!`);
+  };
+
   /**
    * Action: Start practicing a single file with custom ranges, shuffles, cuts, and starting indices.
    */
   const handleStartPractice = (customFileName?: string) => {
     const targetFile = customFileName
-      ? (files.find((f) => f.name === customFileName) || null)
+      ? (activeFiles.find((f) => f.name === customFileName) || null)
       : currentFile;
 
     if (!targetFile || targetFile.questions.length === 0) return;
+
+    setActiveCategoryFilter(null);
+    setSourceQuestions(targetFile.questions);
 
     let pool = [...targetFile.questions];
     const totalCount = pool.length;
@@ -336,6 +488,9 @@ export default function App() {
       }
     }
 
+    setActivePool(playable);
+    setCurrentIndex(startPointer);
+
     setSession({
       type: 'main',
       sourceFiles: [targetFile.name],
@@ -355,7 +510,12 @@ export default function App() {
    * Action: Start Multi-file mixed simulator exams.
    */
   const handleStartSimulation = (selectedQuestions: RawQuestion[], sourceNames: string[]) => {
+    setActiveCategoryFilter(null);
+    setSourceQuestions(selectedQuestions);
+
     const playable = prepareSessionQuestions(selectedQuestions, true, shuffleOptions);
+    setActivePool(playable);
+    setCurrentIndex(0);
 
     setSession({
       type: 'simulation',
@@ -376,7 +536,12 @@ export default function App() {
    * Action: Practice a saved mistake collection from the mistakes tab.
    */
   const handleStartCollectionPractice = (col: MistakeCollection) => {
+    setActiveCategoryFilter(null);
+    setSourceQuestions(col.questions);
+
     const playable = prepareSessionQuestions(col.questions, true, true);
+    setActivePool(playable);
+    setCurrentIndex(0);
 
     setSession({
       type: 'mistakes_only',
@@ -403,11 +568,11 @@ export default function App() {
     const mistakenPlayable: PlayableQuestion[] = [];
     const rawMatches: RawQuestion[] = [];
 
-    session.questions.forEach((q) => {
+    activePool.forEach((q) => {
       const record = session.answers[q.id];
       if (record && !record.isCorrect) {
         mistakenPlayable.push(q);
-        const match = session.originalQuestions.find(oq => oq.id === q.id);
+        const match = sourceQuestions.find(oq => oq.id === q.id);
         if (match) {
           rawMatches.push(match);
         }
@@ -423,10 +588,14 @@ export default function App() {
     setSession({
       ...session,
       type: 'mistakes_interim',
-      pausedIndex: session.currentIndex, // Remember main quiz current spot
+      pausedIndex: currentIndex, // Remember main quiz current spot
+      pausedActivePool: activePool, // Save the pre-interim pool
       questions: reshuffledMistakes,
       currentIndex: 0,
     });
+
+    setActivePool(reshuffledMistakes);
+    setCurrentIndex(0);
 
     setSelectedAnswer(null);
     setIsCorrect(null);
@@ -438,7 +607,7 @@ export default function App() {
   const handleAnswerSelected = (selected: string) => {
     if (!session || selectedAnswer !== null) return;
 
-    const currentQ = session.questions[session.currentIndex];
+    const currentQ = activePool[currentIndex];
     const correct = currentQ.correctAnswer === selected;
 
     setSelectedAnswer(selected);
@@ -468,35 +637,67 @@ export default function App() {
   };
 
   const advanceNextQuestion = () => {
-    setSession((prev) => {
-      if (!prev) return null;
+    const nextIndex = currentIndex + 1;
 
-      const nextIndex = prev.currentIndex + 1;
-
-      if (nextIndex < prev.questions.length) {
+    if (nextIndex < activePool.length) {
+      setCurrentIndex(nextIndex);
+      
+      // Update session's currentIndex for consistency
+      setSession((prev) => {
+        if (!prev) return null;
         return {
           ...prev,
           currentIndex: nextIndex,
         };
+      });
+
+      // Clear or retrieve answers for the next question
+      const nextQ = activePool[nextIndex];
+      const answerRecord = session?.answers[nextQ.id];
+      if (answerRecord) {
+        setSelectedAnswer(answerRecord.selected);
+        setIsCorrect(answerRecord.isCorrect);
       } else {
-        // Finished the current pool
-        if (prev.type === 'mistakes_interim') {
-          // If finished interim errors branch, automatically return to the saved main spot in the quiz
-          return {
-            ...prev,
-            type: 'main',
-            currentIndex: prev.pausedIndex || 0,
-            pausedIndex: undefined,
-          };
-        } else {
-          // Terminate full session, routes to results summaries
-          return {
-            ...prev,
-            currentIndex: prev.questions.length, // Triggers finished state
-          };
-        }
+        setSelectedAnswer(null);
+        setIsCorrect(null);
       }
-    });
+    } else {
+      // Finished the current pool
+      if (session && session.type === 'mistakes_interim') {
+        const resumeIdx = session.pausedIndex || 0;
+        const restoredPool = session.pausedActivePool || [];
+        
+        setActivePool(restoredPool);
+        setCurrentIndex(resumeIdx);
+        
+        setSession({
+          ...session,
+          type: 'main',
+          currentIndex: resumeIdx,
+          pausedIndex: undefined,
+          pausedActivePool: undefined
+        });
+
+        const resumedQ = restoredPool[resumeIdx];
+        if (resumedQ && session.answers[resumedQ.id]) {
+          setSelectedAnswer(session.answers[resumedQ.id].selected);
+          setIsCorrect(session.answers[resumedQ.id].isCorrect);
+        } else {
+          setSelectedAnswer(null);
+          setIsCorrect(null);
+        }
+      } else {
+        // Terminate full session, routes to results summaries
+        setCurrentIndex(activePool.length);
+        setSession((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            currentIndex: activePool.length,
+          };
+        });
+      }
+    }
 
     setSelectedAnswer(null);
     setIsCorrect(null);
@@ -504,7 +705,9 @@ export default function App() {
 
   const handleJumpToQuestion = (targetIdx: number) => {
     if (!session) return;
-    if (targetIdx >= 0 && targetIdx < session.questions.length) {
+    if (targetIdx >= 0 && targetIdx < activePool.length) {
+      setCurrentIndex(targetIdx);
+      
       setSession((prev) => {
         if (!prev) return null;
         return {
@@ -514,7 +717,7 @@ export default function App() {
       });
 
       // Clear/Retrieve answer states for the jumped question
-      const targetQ = session.questions[targetIdx];
+      const targetQ = activePool[targetIdx];
       const answerRecord = session.answers[targetQ.id];
       if (answerRecord) {
         setSelectedAnswer(answerRecord.selected);
@@ -534,10 +737,10 @@ export default function App() {
 
     // Filter only mistaken questions from the finished quiz session
     const mistakenRaw: RawQuestion[] = [];
-    session.questions.forEach((q) => {
+    activePool.forEach((q) => {
       const record = session.answers[q.id];
       if (record && !record.isCorrect) {
-        const rawMatch = session.originalQuestions.find((oq) => oq.id === q.id);
+        const rawMatch = sourceQuestions.find((oq) => oq.id === q.id);
         if (rawMatch) {
           mistakenRaw.push(rawMatch);
         }
@@ -547,6 +750,10 @@ export default function App() {
     if (mistakenRaw.length === 0) return;
 
     const playable = prepareSessionQuestions(mistakenRaw, true, shuffleOptions);
+
+    setSourceQuestions(mistakenRaw);
+    setActivePool(playable);
+    setCurrentIndex(0);
 
     setSession({
       type: 'mistakes_only',
@@ -568,9 +775,9 @@ export default function App() {
 
     // Filter questions that the user starred during the quiz or already has starred
     const flaggedRaw: RawQuestion[] = [];
-    session.questions.forEach((q) => {
+    activePool.forEach((q) => {
       if (flaggedIds.includes(q.id)) {
-        const rawMatch = session.originalQuestions.find((oq) => oq.id === q.id);
+        const rawMatch = sourceQuestions.find((oq) => oq.id === q.id);
         if (rawMatch) {
           flaggedRaw.push(rawMatch);
         }
@@ -582,6 +789,10 @@ export default function App() {
     }
 
     const playable = prepareSessionQuestions(flaggedRaw, true, shuffleOptions);
+
+    setSourceQuestions(flaggedRaw);
+    setActivePool(playable);
+    setCurrentIndex(0);
 
     setSession({
       type: 'flagged_only',
@@ -612,7 +823,7 @@ export default function App() {
       sourceFile: session?.sourceFiles.join(', ') || 'ბაზა',
       questions: subset,
       completedCount: subset.length,
-      successRate: session ? Math.round(((session.questions.length - subset.length) / session.questions.length) * 100) : 0,
+      successRate: session ? Math.round(((activePool.length - subset.length) / activePool.length) * 100) : 0,
     };
 
     setHistory([freshCollection, ...history]);
@@ -638,14 +849,14 @@ export default function App() {
         <div className="max-w-4xl mx-auto px-4 pt-6">
           <header className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between bg-white dark:bg-[#161B22] border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 shadow-sm dark:shadow-[0_4px_30px_rgba(0,0,0,0.4)] gap-4 transition-all">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSession(null)}>
-              <div className="w-10 h-10 bg-gradient-to-tr from-red-600 to-blue-600 dark:from-red-650 dark:to-blue-650 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.35)] dark:shadow-[0_0_15px_rgba(239,68,68,0.55)] text-white select-none bg-red-600">
+              <div className="w-10 h-10 bg-gradient-to-tr from-amber-700 to-teal-750 dark:from-amber-900 dark:to-teal-900 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(180,50,55,0.35)] dark:shadow-[0_0_15px_rgba(180,50,55,0.55)] text-white select-none">
                 <Stethoscope className="w-5 h-5 animate-pulse" />
               </div>
               <div>
                 <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
                   SIMED
-                  <span className="text-teal-600 dark:text-teal-400 font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 border border-teal-200 dark:border-teal-850 rounded-full bg-teal-50 dark:bg-teal-950/25">
-                    Status In Medicina
+                  <span className="text-teal-600 dark:text-teal-400 font-extrabold text-[10px] tracking-wider px-2 py-0.5 border border-teal-200 dark:border-teal-850 rounded-full bg-teal-50 dark:bg-teal-950/25">
+                    Status In MEDicina
                   </span>
                 </h1>
               </div>
@@ -663,22 +874,39 @@ export default function App() {
         {session ? (
           <div id="practicing-session-view" className="space-y-6">
             
+            {activeCategoryFilter && (
+              <div className="max-w-2xl mx-auto p-3.5 bg-slate-100 dark:bg-[#161B22]/65 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between text-xs font-sans text-slate-850 dark:text-slate-200">
+                <div className="flex items-center gap-1.5 font-bold text-slate-600 dark:text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                  <span>მიმდინარეობს ფილტრი:</span>
+                  <span className="text-teal-650 dark:text-teal-400 font-extrabold pr-1.5">{activeCategoryFilter}</span>
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">({activePool.length} კითხვა)</span>
+                </div>
+                <button
+                  onClick={() => handleFilterActiveSessionByCategory(null)}
+                  className="px-2.5 py-1 rounded-xl bg-slate-200/80 dark:bg-slate-800/80 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold tracking-tight text-slate-700 dark:text-slate-300 transition-all cursor-pointer focus:outline-none"
+                >
+                  გაფილტვრის მოხსნა ✕
+                </button>
+              </div>
+            )}
+
             {/* If there's an active session index, render single playable question card */}
-            {session.currentIndex < session.questions.length ? (
+            {currentIndex < activePool.length ? (
               <QuestionCard
-                question={session.questions[session.currentIndex]}
-                currentIndex={session.currentIndex}
-                totalQuestions={session.questions.length}
+                question={activePool[currentIndex]}
+                currentIndex={currentIndex}
+                totalQuestions={activePool.length}
                 autoAdvance={autoAdvance}
                 onAnswerSelected={handleAnswerSelected}
                 selectedAnswer={selectedAnswer}
                 isCorrect={isCorrect}
                 onNext={() => advanceNextQuestion()}
-                flagged={flaggedIds.includes(session.questions[session.currentIndex].id)}
-                onToggleFlag={() => handleToggleFlag(session.questions[session.currentIndex].id)}
+                flagged={flaggedIds.includes(activePool[currentIndex].id)}
+                onToggleFlag={() => handleToggleFlag(activePool[currentIndex].id)}
                 onPracticeMistakesNow={handlePracticeInterimMistakesNow}
                 mistakesCountSoFar={
-                  session.questions.filter((q) => {
+                  activePool.filter((q) => {
                     const ans = session.answers[q.id];
                     return ans && !ans.isCorrect;
                   }).length
@@ -693,14 +921,20 @@ export default function App() {
                 cutStart={cutStart}
                 cutEnd={cutEnd}
                 onUpdateParams={handleUpdateActiveSessionParamsOnTheFly}
+                chosenMode={chosenMode}
+                originalQuestions={sourceQuestions}
+                onFilterByCategory={handleFilterActiveSessionByCategory}
               />
             ) : (
               // Else, we completed the active session, route to summaries
               <ResultsView
-                questions={session.questions}
+                questions={activePool}
                 answers={session.answers}
-                originalQuestions={session.originalQuestions}
-                onRestart={() => setSession(null)}
+                originalQuestions={sourceQuestions}
+                onRestart={() => {
+                  setSession(null);
+                  setActiveCategoryFilter(null);
+                }}
                 onPracticeMistakes={handleResultsPracticeMistakes}
                 onReviewFlagged={handleResultsReviewFlagged}
                 onSaveMistakesToHistory={handleSaveMistakesToHistory}
@@ -728,7 +962,7 @@ export default function App() {
             </div>
 
             {/* Mode Option Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto pt-4">
               {/* Card 1: Practice Mode */}
               <div 
                 onClick={() => {
@@ -750,7 +984,7 @@ export default function App() {
                     ვარჯიში
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6 font-medium">
-                    უსასრულო ცდები, შეცდომებზე მუშაობა რეალურ დროში, არანაირი ზეწოლა.
+                    უსასრულო ცდები, შეცდომებზე მუშაობა რეალურ დროში.
                   </p>
                 </div>
                 <div className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1.5 transition-all group-hover:translate-x-1">
@@ -776,16 +1010,60 @@ export default function App() {
                       <Flame className="h-6 w-6 animate-pulse" />
                     </div>
                   </div>
-                  <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white mb-2 group-hover:text-red-650 dark:group-hover:text-red-400 transition-colors">
+                  <h3 className="text-lg md:text-xl font-bold text-[#0f172a] dark:text-white mb-2 group-hover:text-red-650 dark:group-hover:text-red-400 transition-colors">
                     გამოცდის სიმულატორი
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6 font-medium">
-                    რამდენიმე ფაილის გაერთიანება, ტაიმერი, რეალური საგამოცდო პირობები.
+                    რამდენიმე ფაილის გაერთიანება და საგნების გენერირებული ერთობლიობა.
                   </p>
                 </div>
                 <div className="text-xs font-bold text-red-650 dark:text-red-400 flex items-center gap-1.5 transition-all group-hover:translate-x-1">
                   <span>დაწყება</span>
                   <ArrowRight className="h-4 w-4" />
+                </div>
+              </div>
+
+              {/* Card 3: Residents Base Mode */}
+              <div 
+                onClick={() => handleStartResidentsDirectly()}
+                className="group relative bg-white dark:bg-[#161B22] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 text-left shadow-sm hover:shadow-md hover:border-slate-805 dark:hover:border-slate-600 transition-all duration-300 pointer-events-auto flex flex-col justify-between cursor-pointer"
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-6">
+                    <span className="text-[10px] font-black uppercase text-slate-900 dark:text-[#F3F4F6] bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+                      რეჟიმი 03
+                    </span>
+                    <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-[#F3F4F6] rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                      <Award className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white mb-2 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                    რეზიდენტურის ბაზა
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6 font-medium">
+                    ნაბიჯი პროფესიულ ავტონომიამდე
+                  </p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-slate-150 dark:border-slate-800">
+                  <div 
+                    className="text-xs font-bold text-slate-900 dark:text-[#F3F4F6] flex items-center gap-1.5 transition-all group-hover:translate-x-1"
+                  >
+                    <span>დაწყება</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </div>
+                  
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setChosenMode('residents');
+                      setActiveTab('all');
+                    }}
+                    className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white flex items-center justify-center gap-1 cursor-pointer transition-colors focus:outline-none"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>ტექსტის ჩასმა / განახლება</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -833,8 +1111,8 @@ export default function App() {
               </button>
               <div className="text-left sm:text-right">
                 <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 block">აქტიური რეჟიმი</span>
-                <span className="text-xs font-extrabold text-teal-600 dark:text-teal-400">
-                  {chosenMode === 'practice' ? 'რეჟიმი 01: ვარჯიში' : 'რეჟიმი 02: გამოცდის სიმულატორი'}
+                <span className="text-xs font-extrabold text-[#008080] dark:text-teal-400">
+                  {chosenMode === 'practice' ? 'რეჟიმი 01: ვარჯიში' : chosenMode === 'simulator' ? 'რეჟიმი 02: გამოცდის სიმულატორი' : 'რეჟიმი 03: რეზიდენტურის ბაზა'}
                 </span>
               </div>
             </div>
@@ -842,7 +1120,7 @@ export default function App() {
             {/* App Nav Workspace Tabs */}
             <div className="flex border-b border-slate-200 dark:border-slate-800">
               {[
-                ...(chosenMode === 'practice' ? [{ id: 'all', label: 'ტესტის პარამეტრები', icon: Sliders }] : []),
+                ...(chosenMode === 'practice' || chosenMode === 'residents' ? [{ id: 'all', label: 'ტესტის პარამეტრები', icon: Sliders }] : []),
                 ...(chosenMode === 'simulator' ? [{ id: 'simulation', label: 'საგამოცდო სიმულატორი', icon: Flame }] : []),
                 { id: 'history', label: 'ჩემი შეცდომები', icon: BookOpen },
               ].map((tab) => {
@@ -873,13 +1151,85 @@ export default function App() {
               {activeTab === 'all' && (
                 <div className="max-w-4xl mx-auto space-y-8">
                   {/* File uploader dropzone */}
-                  <div className="animate-fade-in">
-                    <UploadSection files={files} onFilesChanged={setFiles} />
-                  </div>
+                  {chosenMode !== 'residents' ? (
+                    <div className="animate-fade-in">
+                      <UploadSection files={files} onFilesChanged={setFiles} />
+                    </div>
+                  ) : (
+                    <div className="animate-fade-in bg-slate-905/5 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/60 dark:border-slate-800/80">
+                        <div className="flex items-start gap-3">
+                          <div className="p-3 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl">
+                            <Award className="h-6 w-6 text-yellow-500 animate-pulse" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black text-slate-900 dark:text-white">რეზიდენტურის ოფიციალური ბაზა</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">კითხვების ჯამური რაოდენობა: <span className="font-extrabold text-slate-900 dark:text-white font-mono">{activeFiles[0].questions.length}</span></p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black uppercase text-slate-900 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 h-fit">
+                          {localStorage.getItem('residents_stored_questions') ? 'ჩატვირთულია სრული ბაზა ☑️' : 'ჩაშენებულია საცდელი ბაზა ⚠️'}
+                        </span>
+                      </div>
+
+                      {/* Text paste area for easy import of all 2744 questions */}
+                      <div className="space-y-4">
+                        <label className="text-xs font-bold text-slate-600 dark:text-slate-350 block">ბაზის იმპორტი / ტექსტის ჩასმა (2744 კითხვა):</label>
+                        <textarea
+                          placeholder="///// ჩასვით თქვენი სრული ტექსტური ბაზა აქ...&#10;//// კითხვა...&#10;// ️ სწორი პასუხი...&#10;/// არასწორი...&#10;/// არასწორი..."
+                          className="w-full h-40 p-4 rounded-2xl bg-white dark:bg-[#161B22] border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-slate-900 dark:focus:ring-white focus:outline-none transition-all resize-none pointer-events-auto"
+                          onChange={(e) => setResidentsRawInput(e.target.value)}
+                          value={residentsRawInput}
+                        />
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                          <button
+                            onClick={handleImportResidentsPasted}
+                            className="bg-slate-900 hover:bg-slate-950 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-black font-extrabold text-xs px-5 py-3 rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-98 focus:outline-none"
+                          >
+                            <RefreshCw className="h-4 w-4 shrink-0" />
+                            <span>ბაზის განახლება / იმპორტი</span>
+                          </button>
+
+                          {localStorage.getItem('residents_stored_questions') && (
+                            <button
+                              onClick={() => {
+                                localStorage.removeItem('residents_stored_questions');
+                                setResidentsRawInput('');
+                                // Trigger state refresh
+                                setFiles([...files]);
+                                alert('სრული ბაზა წაიშალა. აღდგენილია საწყისი საცდელი ბაზა.');
+                              }}
+                              className="text-xs font-extrabold text-rose-600 hover:text-rose-500 py-2.5 px-4 hover:bg-rose-500/5 rounded-xl cursor-pointer transition-all focus:outline-none"
+                            >
+                              საწყისის აღდგენა
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* We also let them drag & drop the txt file directly here! */}
+                      <div className="border-t border-slate-200/60 dark:border-slate-800/80 pt-6 space-y-3">
+                        <p className="text-xs font-bold text-slate-600 dark:text-slate-350">ან ჩააგდეთ რეზიდენტურის ბაზის .TXT ფაილი აქ:</p>
+                        <UploadSection
+                          files={[]}
+                          onFilesChanged={(newFiles) => {
+                            if (newFiles.length > 0) {
+                              const uploadedFile = newFiles[0];
+                              const serializedQuestions = JSON.stringify(uploadedFile.questions);
+                              localStorage.setItem('residents_stored_questions', serializedQuestions);
+                              // Trigger state update
+                              setFiles([...files]);
+                              alert(`წარმატებით ჩაიტვირთა ${uploadedFile.questions.length} კითხვა ფაილიდან "${uploadedFile.name}"!`);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* List of active prepared bases with integrated collapsers */}
                   <AnimatePresence mode="popLayout">
-                    {files.length > 0 && (
+                    {activeFiles.length > 0 && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -889,15 +1239,15 @@ export default function App() {
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-805 pb-3">
                           <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-150 flex items-center gap-2">
                             <FolderOpen className="h-5 w-5 text-teal-500 animate-pulse" />
-                            აქტიური საგამოცდო ბაზები ({files.length})
+                            აქტიური საგამოცდო ბაზები ({activeFiles.length})
                           </h3>
                           <span className="text-[11px] bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-3 py-1 rounded-full font-bold">
-                            ჯამური კითხვები: {files.reduce((a, b) => a + b.questions.length, 0)}
+                            ჯამური კითხვები: {activeFiles.reduce((a, b) => a + b.questions.length, 0)}
                           </span>
                         </div>
 
                         <div className="space-y-4">
-                          {files.map((file, fileIdx) => {
+                          {activeFiles.map((file, fileIdx) => {
                             const isExpanded = expandedFileName === file.name;
                             return (
                               <motion.div
@@ -1202,7 +1552,7 @@ export default function App() {
                   </AnimatePresence>
 
                   {/* Empty state prompting upload */}
-                  {files.length === 0 && (
+                  {activeFiles.length === 0 && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -1278,7 +1628,7 @@ export default function App() {
       <footer className="border-t border-slate-200/60 dark:border-slate-800 bg-transparent py-10 text-center">
         <div className="max-w-4xl mx-auto px-4 space-y-2">
           <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-            © 2026 SIMED — Status In Medicina. სპეციალიზებული სამედიცინო საგამოცდო ასისტენტი.
+            © 2026 SIMED — Status In MEDicina. სპეციალიზებული სამედიცინო საგამოცდო ასისტენტი.
           </p>
           <p className="text-[10px] text-slate-450 dark:text-slate-600 font-sans">
             ციფრული პროტოკოლი მედიცინის სტუდენტებისა და ლიცენზირებისთვის მომზადებული რეზიდენტებისთვის.
@@ -1328,6 +1678,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setSession(null);
+                    setActiveCategoryFilter(null);
                     setShowCancelModal(false);
                   }}
                   className="px-4 py-2.5 bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer"

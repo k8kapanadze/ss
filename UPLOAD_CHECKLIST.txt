@@ -1,0 +1,8 @@
+Upload checklist:
+
+1. Open this folder.
+2. Upload all items to the root of k8kapanadze/ss.
+3. The repository root must show index.html and package.json.
+4. Settings -> Pages -> Source must be GitHub Actions.
+5. public/CNAME must remain in the repository. It contains s.imed.com.ge.
+6. Wait for Actions -> Deploy to GitHub Pages to finish successfully.

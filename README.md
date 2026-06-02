@@ -1,46 +1,24 @@
 # ss
 
-SIMED - Status In Medicina არის სამედიცინო საგამოცდო ტესტირების პლატფორმა. აპი მუშაობს ბრაუზერში, ინახავს მონაცემებს `localStorage`-ში და არ საჭიროებს გარე API-ს ან სერვერს.
-
-## შესაძლებლობები
-
-- `.txt` და `.json` ფაილების ატვირთვა
-- სწორი/არასწორი პასუხების ავტომატური ამოცნობა
-- კითხვებისა და პასუხების არევა
-- დიაპაზონით ტესტირება და კითხვების ამოჭრა
-- მრავალფაილიანი გამოცდის სიმულაცია
-- შეცდომების ისტორია და ფავორიტებში მონიშვნა
-- ნათელი/მუქი თემა
-
-## ფაილის ფორმატი
-
-```txt
-//// კითხვა
-// სწორი პასუხი
-/// არასწორი პასუხი
-/// არასწორი პასუხი
-/// არასწორი პასუხი
-```
+SIMED - Status In Medicina არის სამედიცინო ტესტირების პლატფორმა. აპი მუშაობს React/Vite-ზე, ინახავს მონაცემებს ბრაუზერის `localStorage`-ში და GitHub Pages-ზე ქვეყნდება GitHub Actions-ით.
 
 ## გაშვება
-
-საჭიროა Node.js.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Production build:
+## Production build
 
 ```bash
 npm run build
 ```
 
-## GitHub Pages
+## Deployment
 
-Repository-ის სახელი უნდა იყოს `ss`. ატვირთვის შემდეგ გახსენით:
+Repository: `k8kapanadze/ss`
 
-`Settings -> Pages -> Build and deployment -> Source -> GitHub Actions`
+Custom domain: `s.imed.com.ge`
 
-შემდეგ ყოველი `main` branch-ზე push ავტომატურად ააწყობს აპს და გამოაქვეყნებს GitHub Pages-ზე.
+GitHub Pages-ში Source უნდა იყოს `GitHub Actions`. `public/CNAME` ფაილი ინარჩუნებს custom domain-ს deploy-ის შემდეგ.

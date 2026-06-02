@@ -135,7 +135,11 @@ export default function ResultsView({
       {/* Motivational dopaminergic panel matching mockup precisely */}
       <div className="bg-transparent border border-teal-500/30 rounded-2xl p-5 text-center shadow-sm relative overflow-hidden backdrop-blur-md">
         <p className="text-sm md:text-base font-semibold leading-relaxed text-slate-800 dark:text-slate-200 font-sans">
-          „მე ვარსებობ შენი წარმატებისთვის. ახლა მთავარია დოფამინის დონე აიმაღლო, ცოტა დაისვენო და კვლავ თავიდან ვცადოთ.“
+          {totalCompleted > 0 && (mistakeCount / totalCompleted) < 0.1 ? (
+            'შენი ჰიპოკამპი პიკზე მუშაობს! ბაზა უბრალოდ გაანადგურე. ამ შედეგით გამოცდაზე მხოლოდ ფორმალობისთვის თუ მიხვალ!'
+          ) : (
+            'მე ვარსებობ შენი წარმატებისთვის. ახლა მთავარია დოფამინის დონე აიმაღლო, ცოტა დაისვენო და კვლავ თავიდან ვცადოთ.'
+          )}
         </p>
       </div>
 

@@ -1,7 +1,8 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Star, ArrowRight, ArrowLeft, Play, AlertCircle, HelpCircle, CheckCircle, RotateCw, Sliders, MoreVertical, LogOut, BookOpen, Scissors } from 'lucide-react';
-import { PlayableQuestion } from '../types';
+import { PlayableQuestion, RawQuestion } from '../types';
+import { getQuestionCategory } from '../utils';
 
 interface QuestionCardProps {
   question: PlayableQuestion;
@@ -25,6 +26,9 @@ interface QuestionCardProps {
   rangeEnd?: string;
   cutStart?: string;
   cutEnd?: string;
+  chosenMode?: 'practice' | 'simulator' | 'residents' | null;
+  originalQuestions?: RawQuestion[];
+  onFilterByCategory?: (category: string | null) => void;
   onUpdateParams?: (
     newShuffleQ: boolean,
     newShuffleO: boolean,
@@ -58,11 +62,15 @@ export default function QuestionCard({
   rangeEnd = '',
   cutStart = '',
   cutEnd = '',
+  chosenMode = 'practice',
+  originalQuestions = [],
+  onFilterByCategory,
   onUpdateParams,
 }: QuestionCardProps) {
   const [pressedIndex, setPressedIndex] = useState<number | null>(null);
   const [jumpTarget, setJumpTarget] = useState((currentIndex + 1).toString());
   const [showCardDropdown, setShowCardDropdown] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const [localRangeStart, setLocalRangeStart] = useState(rangeStart);
   const [localRangeEnd, setLocalRangeEnd] = useState(rangeEnd);
@@ -78,6 +86,39 @@ export default function QuestionCard({
   }, [rangeStart, rangeEnd, cutStart, cutEnd]);
 
   const optionsToDisplay = shuffleOptions ? question.options : (question.rawOptions || question.options);
+
+  // Compute categories and counts for Table of Contents
+  const categoriesWithCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const pool = originalQuestions || [];
+    pool.forEach((q) => {
+      const cat = getQuestionCategory(q.text);
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+
+    const order = [
+      'კარდიოლოგია',
+      'პულმონოლოგია',
+      'გასტროენტეროლოგია',
+      'ნეფროლოგია',
+      'ჰემატოლოგია',
+      'ენდოკრინოლოგია',
+      'რევმატოლოგია',
+      'ალერგოლოგია-იმუნოლოგია',
+      'ნევროლოგია',
+      'პედიატრია',
+      'მეანობა-გინეკოლოგია',
+      'ქირურგია',
+      'სხვა მიმართულებები'
+    ];
+
+    return order
+      .map((name) => ({
+        name,
+        count: counts[name] || 0
+      }))
+      .filter((item) => item.count > 0);
+  }, [originalQuestions]);
 
   useEffect(() => {
     setJumpTarget((currentIndex + 1).toString());
@@ -143,16 +184,28 @@ export default function QuestionCard({
           )}
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-xs text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wide hidden sm:inline">კითხვა</span>
-            <span className="font-mono text-sm font-black text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 px-2.5 py-1 rounded-xl border border-teal-100/50 dark:border-teal-900/30">
+            <span className={`font-mono text-sm font-black px-2.5 py-1 rounded-xl border ${
+              chosenMode === 'simulator'
+                ? 'text-red-650 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30'
+                : chosenMode === 'residents'
+                ? 'text-slate-900 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                : 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border-teal-100/50 dark:border-teal-900/30'
+            }`}>
               {currentIndex + 1} / {totalQuestions}
             </span>
           </div>
         </div>
 
-        {/* Centered Bon courage with elegant custom cold blue color */}
+        {/* Centered Active Mode Name with elegant custom colors */}
         <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center justify-center pointer-events-none select-none">
-          <span className="text-xs font-sans font-black uppercase tracking-[0.2em] text-[#3B82F6] dark:text-[#60A5FA]">
-            Bon courage! 🩺
+          <span className={`text-xs font-sans font-black uppercase tracking-[0.2em] ${
+            chosenMode === 'simulator'
+              ? 'text-red-650 dark:text-red-400'
+              : chosenMode === 'residents'
+              ? 'text-slate-905 dark:text-slate-300'
+              : 'text-[#3B82F6] dark:text-[#60A5FA]'
+          }`}>
+            BON COURAGE!⚕️
           </span>
         </div>
 
@@ -176,7 +229,13 @@ export default function QuestionCard({
                 }
               }}
               placeholder="#"
-              className="w-10 text-center text-xs font-mono font-black border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0C10] rounded-lg py-1 px-1 focus:outline-none focus:ring-2 focus:ring-teal-500/15 focus:border-teal-500 transition-all"
+              className={`w-10 text-center text-xs font-mono font-black border bg-slate-50 dark:bg-[#0A0C10] rounded-lg py-1 px-1 focus:outline-none focus:ring-2 transition-all ${
+                chosenMode === 'simulator'
+                  ? 'border-red-200 dark:border-red-900/40 focus:ring-red-500/15 focus:border-red-500'
+                  : chosenMode === 'residents'
+                  ? 'border-slate-300 dark:border-slate-700 focus:ring-slate-500/15 focus:border-slate-500'
+                  : 'border-slate-200 dark:border-slate-800 focus:ring-teal-500/15 focus:border-teal-500'
+              }`}
               title="გადასვლა კითხვაზე"
             />
             <button
@@ -188,7 +247,13 @@ export default function QuestionCard({
                 }
               }}
               disabled={!jumpTarget || parseInt(jumpTarget) < 1 || parseInt(jumpTarget) > totalQuestions}
-              className="px-2 py-1 bg-[#0f172a] hover:bg-[#1e293b] dark:bg-teal-500 dark:hover:bg-teal-400 text-white dark:text-[#0A0C10] disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold rounded-lg transition-all cursor-pointer"
+              className={`px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold rounded-lg transition-all cursor-pointer text-white ${
+                chosenMode === 'simulator'
+                  ? 'bg-red-650 hover:bg-red-700'
+                  : chosenMode === 'residents'
+                  ? 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600'
+                  : 'bg-[#0f172a] hover:bg-[#1e293b] dark:bg-teal-500 dark:hover:bg-teal-400 dark:text-[#0A0C10]'
+              }`}
             >
               სვლა
             </button>
@@ -221,7 +286,9 @@ export default function QuestionCard({
                   >
                     {/* Database origin detail */}
                     <div className="px-1 pb-2 border-b border-slate-100 dark:border-slate-800/85 text-[10px] text-slate-500 dark:text-slate-400 font-bold leading-normal break-words">
-                      ბაზა: {question.sourceFile} <span className="text-teal-650 dark:text-teal-400 font-mono">(#{question.originalIndex})</span>
+                      ბაზა: {question.sourceFile} <span className={`font-mono ${
+                        chosenMode === 'simulator' ? 'text-red-500' : chosenMode === 'residents' ? 'text-slate-400' : 'text-teal-650 dark:text-teal-400'
+                      }`}>(#{question.originalIndex})</span>
                     </div>
 
                     {/* Standard Quick Actions */}
@@ -242,6 +309,21 @@ export default function QuestionCard({
                         <span>{flagged ? 'ფავორიტიდან ამოშლა' : 'ფავორიტებში შენახვა'}</span>
                       </button>
 
+                      {/* SARCHEVI Option for Table of Contents */}
+                      {originalQuestions && originalQuestions.length > 0 && onFilterByCategory && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCardDropdown(false);
+                            setShowSidebar(true);
+                          }}
+                          className="w-full px-2.5 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-900/60 text-xs font-bold rounded-xl transition-all cursor-pointer text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 border-0 bg-transparent outline-none"
+                        >
+                          <BookOpen className={`h-3.5 w-3.5 ${chosenMode === 'simulator' ? 'text-red-500' : chosenMode === 'residents' ? 'text-slate-400' : 'text-teal-500'}`} />
+                          <span>სარჩევი (საგნები)</span>
+                        </button>
+                      )}
+
                       {/* Mistakes Option */}
                       {mistakesCountSoFar > 0 && !isMistakesSession && onPracticeMistakesNow && (
                         <button
@@ -252,7 +334,9 @@ export default function QuestionCard({
                           }}
                           className="w-full px-2.5 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-900/60 text-xs font-bold rounded-xl transition-all cursor-pointer text-left flex items-center gap-2 text-slate-700 dark:text-slate-300"
                         >
-                          <RotateCw className="h-3.5 w-3.5 text-teal-500" />
+                          <RotateCw className={`h-3.5 w-3.5 ${
+                            chosenMode === 'simulator' ? 'text-red-500' : chosenMode === 'residents' ? 'text-slate-400' : 'text-teal-500'
+                          }`} />
                           <span>შეცდომების გავლა ({mistakesCountSoFar})</span>
                         </button>
                       )}
@@ -439,10 +523,16 @@ export default function QuestionCard({
         </div>
       </div>
 
-      {/* Actual Progress Bar */}
+           {/* Actual Progress Bar */}
       <div className="w-full bg-slate-150 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden shadow-inner font-sans">
         <motion.div
-          className="bg-teal-500 dark:bg-teal-400 h-full rounded-full"
+          className={`h-full rounded-full ${
+            chosenMode === 'simulator'
+              ? 'bg-red-550 dark:bg-red-400'
+              : chosenMode === 'residents'
+              ? 'bg-slate-900 dark:bg-white'
+              : 'bg-teal-500 dark:bg-teal-400'
+          }`}
           initial={{ width: 0 }}
           animate={{ width: `${progressPercent}%` }}
           transition={{ duration: 0.3 }}
@@ -470,7 +560,13 @@ export default function QuestionCard({
 
         {/* Question Text */}
         <div className="pr-12">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 px-2.5 py-1 rounded-md border border-teal-200 dark:border-teal-900/50">
+          <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-md border ${
+            chosenMode === 'simulator'
+              ? 'text-red-650 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200/50 dark:border-red-900/55'
+              : chosenMode === 'residents'
+              ? 'text-slate-900 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border-slate-300 dark:border-slate-705'
+              : 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-900/50'
+          }`}>
             სამედიცინო კითხვა
           </span>
           <h1 className="text-lg md:text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight font-sans mt-3 whitespace-pre-wrap leading-relaxed">
@@ -503,8 +599,16 @@ export default function QuestionCard({
                 circleStyle = 'bg-slate-100 dark:bg-slate-950 text-slate-400 dark:text-slate-500';
               }
             } else if (pressedIndex === idx) {
-              btnStyle = 'border-teal-500 dark:border-teal-400 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300';
-              circleStyle = 'bg-teal-600 text-white border-transparent';
+              if (chosenMode === 'simulator') {
+                btnStyle = 'border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300';
+                circleStyle = 'bg-red-650 text-white border-transparent';
+              } else if (chosenMode === 'residents') {
+                btnStyle = 'border-slate-900 dark:border-white bg-[#121824] dark:bg-[#080b11] text-[#0f172a] dark:text-slate-100 ring-1 ring-slate-400 dark:ring-slate-700';
+                circleStyle = 'bg-slate-900 dark:bg-white text-white dark:text-[#0A0C10] border-transparent';
+              } else {
+                btnStyle = 'border-teal-500 dark:border-teal-400 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300';
+                circleStyle = 'bg-teal-600 text-white border-transparent';
+              }
             }
 
             return (
@@ -534,25 +638,25 @@ export default function QuestionCard({
               exit={{ opacity: 0, y: 10 }}
               className={`p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                 isCorrect
-                  ? 'bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/30 text-emerald-800 dark:text-emerald-400'
-                  : 'bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-800/30 text-rose-800 dark:text-rose-450'
+                  ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border border-[0.5px] border-emerald-500/20 text-emerald-800 dark:text-emerald-400'
+                  : 'bg-[#FFF5F5] dark:bg-[#170B0E] border border-[0.5px] border-rose-200/40 dark:border-rose-950/30 text-rose-700 dark:text-rose-400'
               }`}
             >
               <div className="flex items-center gap-2 text-sm font-bold">
                 <AlertCircle className="h-4 w-4" />
                 <span>
                   {isCorrect
-                    ? 'სწორია! შესანიშნავი ნაბიჯია.'
+                    ? 'სწორი პასუხი.'
                     : 'არასწორია! დაიმახსოვრეთ სწორი პასუხი (მონიშნულია მწვანედ).'}
                 </span>
               </div>
 
               <button
                 onClick={onNext}
-                className="py-2.5 px-4 bg-teal-500 hover:bg-teal-400 dark:bg-teal-500 dark:hover:bg-teal-400 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 focus:outline-none transition-all shadow-sm"
+                className="py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 focus:outline-none transition-all shadow-md active:scale-95 cursor-pointer bg-white hover:bg-slate-100 text-slate-900 border border-slate-200"
               >
                 {currentIndex + 1 === totalQuestions ? 'შედეგების ნახვა' : 'შემდეგი კითხვა'}
-                <ArrowRight className="h-3.5 w-3.5 text-slate-950" />
+                <ArrowRight className="h-3.5 w-3.5 text-slate-900" />
               </button>
             </motion.div>
           )}
@@ -567,7 +671,13 @@ export default function QuestionCard({
           </div>
           <button
             onClick={onPracticeMistakesNow}
-            className="px-3 py-2 bg-teal-50/60 hover:bg-teal-100 dark:bg-teal-950/30 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-400 border border-teal-200/60 dark:border-teal-800/80 text-xs font-bold rounded-lg shrink-0 flex items-center gap-1.5 focus:outline-none transition-all"
+            className={`px-3 py-2 text-xs font-bold rounded-lg shrink-0 flex items-center gap-1.5 focus:outline-none transition-all border ${
+              chosenMode === 'simulator'
+                ? 'bg-red-50/60 hover:bg-red-100 dark:bg-red-955/30 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 border-red-200/60'
+                : chosenMode === 'residents'
+                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-705 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+                : 'bg-teal-50/60 hover:bg-teal-100 dark:bg-teal-950/30 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-400 border-teal-200/60 border-teal-800/80'
+            }`}
           >
             <RotateCw className="h-3.5 w-3.5" />
             შეცდომების გავლა ახლავე ({mistakesCountSoFar})
@@ -581,6 +691,82 @@ export default function QuestionCard({
           კლავიატურა: [1-4] ან [A-D] პასუხის ასარჩევად • [Space/Enter] შემდეგ კითხვაზე გადასასვლელად
         </span>
       </div>
+
+      {/* Sliding Sidebar Drawer (სარჩევი) */}
+      <AnimatePresence>
+        {showSidebar && (
+          <>
+            {/* Blurred Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSidebar(false)}
+              className="fixed inset-0 bg-black z-50 backdrop-blur-xs"
+            />
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="fixed right-0 top-0 bottom-0 w-80 max-w-full bg-white dark:bg-[#121824] border-l border-slate-200 dark:border-slate-800 z-50 flex flex-col shadow-2xl overflow-hidden font-sans text-left"
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+                  <span className="font-extrabold text-[#0f172a] dark:text-white text-base">სარჩევი</span>
+                </div>
+                <button
+                  onClick={() => setShowSidebar(false)}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer focus:outline-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Content - Category List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                {/* Option to Reset and see All Questions */}
+                <button
+                  onClick={() => {
+                    if (onFilterByCategory) {
+                      onFilterByCategory(null);
+                      setShowSidebar(false);
+                    }
+                  }}
+                  className="w-full p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 text-xs font-bold text-center text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer"
+                >
+                  ყველა კითხვის ჩვენება (გაფილტვრის მოხსნა)
+                </button>
+
+                {categoriesWithCounts.map((cat) => {
+                  return (
+                    <button
+                      key={cat.name}
+                      onClick={() => {
+                        if (onFilterByCategory) {
+                          onFilterByCategory(cat.name);
+                          setShowSidebar(false);
+                        }
+                      }}
+                      className="w-full p-4 rounded-2xl bg-slate-50 hover:bg-slate-100/80 dark:bg-[#161B22]/50 dark:hover:bg-[#161B22]/90 border border-slate-150 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 text-left transition-all cursor-pointer group flex flex-col gap-1 focus:outline-none"
+                    >
+                      <div className="text-sm font-bold text-[#0f172a] dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                        {cat.name}
+                      </div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">
+                        {cat.count}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -36,6 +36,7 @@ export interface ActiveSession {
   currentIndex: number;
   answers: { [questionId: string]: { selected: string; isCorrect: boolean } };
   pausedIndex?: number;             // Saved main session index when jumping into real-time mistake practice
+  pausedActivePool?: PlayableQuestion[]; // Saved main active pool when jumping into real-time mistake practice
 }
 
 export interface FileData {

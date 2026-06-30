@@ -1181,6 +1181,7 @@ export default function App() {
 
                   {/* List of active prepared bases with integrated collapsers — hidden in residents mode */}
                   {chosenMode !== 'residents' && (
+                  <>
                   <AnimatePresence mode="popLayout">
                     {activeFiles.length > 0 && (
                       <motion.div
@@ -1528,9 +1529,7 @@ export default function App() {
                       </div>
                     </motion.div>
                   )}
-
-                  {/* Purged old form properties block */}
-                  <div className="hidden" />
+                  </>
                   )}
                 </div>
               )}

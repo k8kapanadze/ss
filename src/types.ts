@@ -39,10 +39,25 @@ export interface ActiveSession {
   pausedActivePool?: PlayableQuestion[]; // Saved main active pool when jumping into real-time mistake practice
 }
 
+export interface QuestionParseError {
+  index: number;
+  preview: string;
+  reason: string;
+}
+
+export interface QuestionParseSummary {
+  totalDetected: number;
+  successCount: number;
+  errorCount: number;
+  wasMessyFormat: boolean;
+  errors: QuestionParseError[];
+}
+
 export interface FileData {
   name: string;
   questions: RawQuestion[];
   sizeStr: string;
+  parseSummary?: QuestionParseSummary;
 }
 
 export interface SimulationConfig {

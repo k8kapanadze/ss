@@ -1,4 +1,153 @@
-﻿import { RawQuestion, PlayableQuestion } from './types';
+﻿import { RawQuestion, PlayableQuestion, QuestionParseSummary } from './types';
+
+/**
+ * Detects whether the raw uploaded text is in the "messy" export format
+ * (¢ ID=..., ❌/✔️ markers, * separators, ⮲ block terminator) rather than
+ * the platform's strict //// // /// format.
+ */
+export function isMessyFormat(text: string): boolean {
+  return /¢\s*ID=/i.test(text) || text.includes('⮲') || text.includes('❌') || text.includes('✔');
+}
+
+/**
+ * Converts the messy raw export format into the strict //// // /// format
+ * understood by parseQuestionFile.
+ *
+ * Messy format example:
+ *   ¢ ID=00001 Question text? * ❌ა. Wrong * ✔️ბ. Right * ❌გ. Wrong ⮲
+ *
+ * Rules applied:
+ * - Blocks are separated by ⮲
+ * - Segments within a block are separated by *
+ * - The first segment holds "¢ ID=..." followed by the question text
+ * - ❌ marks an incorrect option, ✔️ marks the correct option
+ * - Georgian letter prefixes ("ა. ", "ბ. ", etc.) right after the emoji are stripped
+ */
+export function preprocessMessyFormat(raw: string): string {
+  // Normalize away emoji variation selectors (U+FE0F) so "✔️" and "✔" match the same way
+  const normalized = raw.replace(/\uFE0F/g, '');
+  const blocks = normalized.split('⮲').map((b) => b.trim()).filter(Boolean);
+  const output: string[] = [];
+
+  for (const block of blocks) {
+    // Skip stray fragments that don't actually look like a question block
+    if (!/¢\s*ID=/i.test(block) && !/[❌✔]/.test(block)) continue;
+
+    const parts = block.split('*').map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 0) continue;
+
+    let questionText = '';
+    const options: { text: string; correct: boolean }[] = [];
+
+    parts.forEach((part, idx) => {
+      const isOption = /^[❌✔]/.test(part);
+
+      if (isOption) {
+        const correct = part.startsWith('✔');
+        let optText = part.replace(/^[❌✔]\s*/, '');
+        // Strip Georgian letter prefixes like "ა. ", "ბ. ", "გ. ", "დ. "
+        optText = optText.replace(/^[ა-ჰ]\s*\.\s*/u, '').trim();
+        if (optText) options.push({ text: optText, correct });
+      } else if (idx === 0) {
+        // The first non-option segment carries the "¢ ID=xxxxx" prefix + question text
+        questionText = part.replace(/¢\s*ID=\S+\s*/i, '').trim();
+      } else if (!questionText) {
+        // Fallback: stray text segment before any option was found
+        questionText = part.trim();
+      }
+    });
+
+    if (!questionText) continue;
+    if (options.length === 0) continue;
+
+    const correctOpt = options.find((o) => o.correct);
+    const incorrectOpts = options.filter((o) => !o.correct);
+
+    let blockOut = `//// ${questionText}`;
+    if (correctOpt) blockOut += `\n// ${correctOpt.text}`;
+    incorrectOpts.forEach((o) => {
+      blockOut += `\n/// ${o.text}`;
+    });
+
+    output.push(blockOut);
+  }
+
+  return output.join('\n\n');
+}
+
+/**
+ * Walks an already strict-format (//// // ///) text and builds a validation
+ * summary: how many question blocks were detected, how many are well formed
+ * (have text + a correct answer + at least one incorrect answer), and which
+ * ones have problems (e.g. missing a correct answer).
+ */
+function summarizeStrictFormat(text: string): Omit<QuestionParseSummary, 'wasMessyFormat'> {
+  const lines = text.split(/\r?\n/);
+  type Block = { text: string; hasCorrect: boolean; hasIncorrect: boolean };
+  const blocks: Block[] = [];
+  let current: Block | null = null;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    if (line.startsWith('////')) {
+      if (current) blocks.push(current);
+      current = { text: line.substring(4).trim(), hasCorrect: false, hasIncorrect: false };
+    } else if (line.startsWith('///')) {
+      if (current) current.hasIncorrect = true;
+    } else if (line.startsWith('//')) {
+      if (current) current.hasCorrect = true;
+    } else if (current && !current.hasCorrect && !current.hasIncorrect) {
+      current.text = (current.text ? current.text + ' ' : '') + line;
+    }
+  }
+  if (current) blocks.push(current);
+
+  const errors: QuestionParseSummary['errors'] = [];
+  let successCount = 0;
+
+  blocks.forEach((b, idx) => {
+    const preview = (b.text && b.text.slice(0, 50)) || `კითხვა #${idx + 1}`;
+    if (!b.text) {
+      errors.push({ index: idx + 1, preview, reason: 'კითხვის ტექსტი არ მოიძებნა' });
+    } else if (!b.hasCorrect) {
+      errors.push({ index: idx + 1, preview, reason: 'სწორი პასუხი ვერ მოიძებნა' });
+    } else if (!b.hasIncorrect) {
+      errors.push({ index: idx + 1, preview, reason: 'არასწორი პასუხები ვერ მოიძებნა' });
+    } else {
+      successCount++;
+    }
+  });
+
+  return {
+    totalDetected: blocks.length,
+    successCount,
+    errorCount: errors.length,
+    errors,
+  };
+}
+
+/**
+ * Single entry point for handling an uploaded quiz file. Auto-detects the
+ * messy raw export format, converts it to the strict format when needed,
+ * parses it into RawQuestion[], and returns a validation summary describing
+ * how many questions parsed cleanly vs. had formatting problems.
+ */
+export function parseUploadedQuizText(
+  text: string,
+  fileName: string
+): { questions: RawQuestion[]; summary: QuestionParseSummary } {
+  const messy = isMessyFormat(text);
+  const strictText = messy ? preprocessMessyFormat(text) : text;
+
+  const baseSummary = summarizeStrictFormat(strictText);
+  const summary: QuestionParseSummary = { ...baseSummary, wasMessyFormat: messy };
+
+  const questions = parseQuestionFile(strictText, fileName);
+
+  return { questions, summary };
+}
 
 /**
  * Parses medical question text file into RawQuestion array.

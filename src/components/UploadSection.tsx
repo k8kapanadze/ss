@@ -1,7 +1,7 @@
 ﻿import React, { useState, useRef } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { FileData } from '../types';
-import { parseQuestionFile, formatBytes } from '../utils';
+import { parseUploadedQuizText, formatBytes } from '../utils';
 
 interface UploadSectionProps {
   files: FileData[];
@@ -16,9 +16,9 @@ export default function UploadSection({ files, onFilesChanged }: UploadSectionPr
 
   const handleTextProcessing = (text: string, name: string) => {
     try {
-      const parsed = parseQuestionFile(text, name);
+      const { questions: parsed, summary } = parseUploadedQuizText(text, name);
       if (parsed.length === 0) {
-        setErrorMsg(`ფაილში "${name}" კითხვები ვერ მოიძებნა. გთხოვთ შეამოწმოთ ფორმატი: (////, //, ///)`);
+        setErrorMsg(`ფაილში "${name}" კითხვები ვერ მოიძებნა. გთხოვთ შეამოწმოთ ფორმატი: (////, //, ///) ან მესენჯერის (¢ ID=, ❌, ✔️) ფორმატი.`);
         setSuccessMsg(null);
         return;
       }
@@ -34,10 +34,20 @@ export default function UploadSection({ files, onFilesChanged }: UploadSectionPr
         name,
         questions: parsed,
         sizeStr: formatBytes(text.length),
+        parseSummary: summary,
       };
 
       onFilesChanged([...files, newFileData]);
-      setSuccessMsg(`ფაილი წარმატებით ჩაიტვირთა — ნაპოვნია ${parsed.length} კითხვა!`);
+
+      const formatNote = summary.wasMessyFormat ? ' (ავტომატურად დამუშავდა მესენჯერის ფორმატიდან)' : '';
+      if (summary.errorCount > 0) {
+        setSuccessMsg(
+          `ფაილი ჩაიტვირთა${formatNote} — წარმატებით დამუშავდა ${summary.successCount} კითხვა, ` +
+          `ხოლო ${summary.errorCount} კითხვაში აღმოჩენილია ფორმატის შეცდომა (მაგ. სწორი პასუხის გარეშე).`
+        );
+      } else {
+        setSuccessMsg(`ფაილი წარმატებით ჩაიტვირთა${formatNote} — ნაპოვნია ${summary.successCount} კითხვა!`);
+      }
       setErrorMsg(null);
     } catch (err) {
       setErrorMsg(`ფაილის დამუშავებისას მოხდა შეცდომა.`);

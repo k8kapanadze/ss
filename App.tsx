@@ -1181,6 +1181,7 @@ export default function App() {
 
                   {/* List of active prepared bases with integrated collapsers — hidden in residents mode */}
                   {chosenMode !== 'residents' && (
+                  <>
                   <AnimatePresence mode="popLayout">
                     {activeFiles.length > 0 && (
                       <motion.div
@@ -1225,6 +1226,11 @@ export default function App() {
                                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                         ზომა: {file.sizeStr} • <span className="text-teal-600 dark:text-teal-400 font-bold">{file.questions.length} კითხვა</span>
                                       </p>
+                                      {file.parseSummary && file.parseSummary.errorCount > 0 && (
+                                        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                                          ⚠ {file.parseSummary.errorCount} კითხვაში ფორმატის შეცდომაა (მაგ. სწორი პასუხის გარეშე)
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
 
@@ -1523,9 +1529,7 @@ export default function App() {
                       </div>
                     </motion.div>
                   )}
-
-                  {/* Purged old form properties block */}
-                  <div className="hidden" />
+                  </>
                   )}
                 </div>
               )}

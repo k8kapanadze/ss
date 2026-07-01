@@ -10,27 +10,40 @@ export function isMessyFormat(text: string): boolean {
 }
 
 /**
- * Converts the messy raw export format into the strict //// // /// format
- * understood by parseQuestionFile.
+ * Converts the messy raw export format into the strict //// // /// format.
  *
- * Messy format example:
- *   ¢ ID=00001 Question text? * ❌ა. Wrong * ✔️ბ. Right * ❌გ. Wrong ⮲
+ * Handles two sub-variants automatically:
  *
- * Rules applied:
- * - Blocks are separated by ⮲
- * - Segments within a block are separated by *
- * - The first segment holds "¢ ID=..." followed by the question text
- * - ❌ marks an incorrect option, ✔️ marks the correct option
- * - Georgian letter prefixes ("ა. ", "ბ. ", etc.) right after the emoji are stripped
+ * Variant A — ⮲ terminated, * separated (old export):
+ *   ¢ ID=00001 Question? * ❌ა. Wrong * ✔️ბ. Right * ❌გ. Wrong ⮲
+ *
+ * Variant B — ¢ ID= newline separated (new export, no ⮲ or *):
+ *   ¢ ID=00001  1) Question?
+ *   ❌ Wrong 1
+ *   ✔️ Right
+ *   ❌ Wrong 2
+ *   ¢ ID=00002  2) ...
  */
 export function preprocessMessyFormat(raw: string): string {
-  // Normalize away emoji variation selectors (U+FE0F) so "✔️" and "✔" match the same way
-  const normalized = raw.replace(/\uFE0F/g, '');
-  const blocks = normalized.split('⮲').map((b) => b.trim()).filter(Boolean);
+  // Normalize variation selectors and LINE SEPARATOR (U+2028) → regular newline
+  const normalized = raw.replace(/\uFE0F/g, '').replace(/\u2028/g, '\n');
+
+  // Decide which variant we're dealing with
+  const hasTerminator = normalized.includes('⮲');
+
+  if (hasTerminator) {
+    return preprocessVariantA(normalized);
+  } else {
+    return preprocessVariantB(normalized);
+  }
+}
+
+/** Variant A: blocks separated by ⮲, options separated by * */
+function preprocessVariantA(text: string): string {
+  const blocks = text.split('⮲').map((b) => b.trim()).filter(Boolean);
   const output: string[] = [];
 
   for (const block of blocks) {
-    // Skip stray fragments that don't actually look like a question block
     if (!/¢\s*ID=/i.test(block) && !/[❌✔]/.test(block)) continue;
 
     const parts = block.split('*').map((p) => p.trim()).filter(Boolean);
@@ -41,36 +54,70 @@ export function preprocessMessyFormat(raw: string): string {
 
     parts.forEach((part, idx) => {
       const isOption = /^[❌✔]/.test(part);
-
       if (isOption) {
         const correct = part.startsWith('✔');
-        let optText = part.replace(/^[❌✔]\s*/, '');
-        // Strip Georgian letter prefixes like "ა. ", "ბ. ", "გ. ", "დ. "
-        optText = optText.replace(/^[ა-ჰ]\s*\.\s*/u, '').trim();
+        let optText = part.replace(/^[❌✔]\s*/, '').replace(/^[ა-ჰ]\s*\.\s*/u, '').trim();
         if (optText) options.push({ text: optText, correct });
       } else if (idx === 0) {
-        // The first non-option segment carries the "¢ ID=xxxxx" prefix + question text
         questionText = part.replace(/¢\s*ID=\S+\s*/i, '').trim();
       } else if (!questionText) {
-        // Fallback: stray text segment before any option was found
         questionText = part.trim();
       }
     });
 
-    if (!questionText) continue;
-    if (options.length === 0) continue;
-
-    // Output options in the exact order they appeared in the source block,
-    // using // for correct and /// for incorrect — this preserves file order.
-    let blockOut = `//// ${questionText}`;
-    options.forEach((o) => {
-      blockOut += o.correct ? `\n// ${o.text}` : `\n/// ${o.text}`;
-    });
-
-    output.push(blockOut);
+    if (!questionText || options.length === 0) continue;
+    output.push(buildStrictBlock(questionText, options));
   }
 
   return output.join('\n\n');
+}
+
+/** Variant B: blocks start with ¢ ID=, options on separate lines (no ⮲ or *) */
+function preprocessVariantB(text: string): string {
+  // Split on ¢ ID= markers — each marks the start of a new question block
+  const rawBlocks = text.split(/(?=¢\s*ID=)/i).map((b) => b.trim()).filter(Boolean);
+  const output: string[] = [];
+
+  for (const block of rawBlocks) {
+    if (!/¢\s*ID=/i.test(block)) continue;
+
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) continue;
+
+    let questionText = '';
+    const options: { text: string; correct: boolean }[] = [];
+
+    for (const line of lines) {
+      if (/^¢\s*ID=/i.test(line)) {
+        // First line: strip "¢ ID=XXXXX" prefix and any leading numbering like "1) "
+        questionText = line.replace(/¢\s*ID=\S+\s*/i, '').replace(/^\d+\)\s*/, '').trim();
+      } else if (/^[❌✔]/.test(line)) {
+        const correct = line.startsWith('✔');
+        const optText = line
+          .replace(/^[❌✔]\s*/, '')
+          .replace(/^[ა-ჰ]\s*\.\s*/u, '')
+          .trim();
+        if (optText) options.push({ text: optText, correct });
+      } else if (questionText && options.length === 0) {
+        // Additional question text line before any options
+        questionText += ' ' + line;
+      }
+    }
+
+    if (!questionText || options.length === 0) continue;
+    output.push(buildStrictBlock(questionText, options));
+  }
+
+  return output.join('\n\n');
+}
+
+/** Emit a strict-format block preserving original option order */
+function buildStrictBlock(questionText: string, options: { text: string; correct: boolean }[]): string {
+  let block = `//// ${questionText}`;
+  for (const o of options) {
+    block += o.correct ? `\n// ${o.text}` : `\n/// ${o.text}`;
+  }
+  return block;
 }
 
 /**

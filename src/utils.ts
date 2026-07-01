@@ -235,7 +235,10 @@ export function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Builds playable questions by scrambling the option order and optionally shuffling the questions too.
+ * Builds playable questions preserving file order by default.
+ * Questions shuffle only when shuffleQuestions=true.
+ * Answer options shuffle only when shuffleOptions=true; otherwise they
+ * keep the original parsed order (correct answer first, then incorrects).
  */
 export function prepareSessionQuestions(
   rawQuestions: RawQuestion[],
@@ -249,10 +252,7 @@ export function prepareSessionQuestions(
 
   return list.map((q) => {
     const rawOptions = [q.correctAnswer, ...q.incorrectAnswers].filter(Boolean);
-    let options = [...rawOptions];
-    if (shuffleOptions) {
-      options = shuffleArray(options);
-    }
+    const options = shuffleOptions ? shuffleArray(rawOptions) : [...rawOptions];
     return {
       id: q.id,
       text: q.text,

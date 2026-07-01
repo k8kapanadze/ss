@@ -498,7 +498,7 @@ export default function App() {
     setActiveCategoryFilter(null);
     setSourceQuestions(selectedQuestions);
 
-    const playable = prepareSessionQuestions(selectedQuestions, true, shuffleOptions);
+    const playable = prepareSessionQuestions(selectedQuestions, shuffleQuestions, shuffleOptions);
     setActivePool(playable);
     setCurrentIndex(0);
 
@@ -524,7 +524,7 @@ export default function App() {
     setActiveCategoryFilter(null);
     setSourceQuestions(col.questions);
 
-    const playable = prepareSessionQuestions(col.questions, true, true);
+    const playable = prepareSessionQuestions(col.questions, shuffleQuestions, shuffleOptions);
     setActivePool(playable);
     setCurrentIndex(0);
 
@@ -566,8 +566,8 @@ export default function App() {
 
     if (mistakenPlayable.length === 0) return;
 
-    // Scramble the mistakes list so they don't solve it in the same order
-    const reshuffledMistakes = prepareSessionQuestions(rawMatches, true, shuffleOptions);
+    // Re-order mistakes according to the user's current shuffle preference
+    const reshuffledMistakes = prepareSessionQuestions(rawMatches, shuffleQuestions, shuffleOptions);
 
     // Swap session to temporary interim errors practicing mode, storing the main progress index
     setSession({
@@ -732,7 +732,7 @@ export default function App() {
 
     if (mistakenRaw.length === 0) return;
 
-    const playable = prepareSessionQuestions(mistakenRaw, true, shuffleOptions);
+    const playable = prepareSessionQuestions(mistakenRaw, shuffleQuestions, shuffleOptions);
 
     setSourceQuestions(mistakenRaw);
     setActivePool(playable);
@@ -771,7 +771,7 @@ export default function App() {
       return;
     }
 
-    const playable = prepareSessionQuestions(flaggedRaw, true, shuffleOptions);
+    const playable = prepareSessionQuestions(flaggedRaw, shuffleQuestions, shuffleOptions);
 
     setSourceQuestions(flaggedRaw);
     setActivePool(playable);

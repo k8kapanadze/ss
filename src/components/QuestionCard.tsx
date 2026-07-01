@@ -337,7 +337,7 @@ export default function QuestionCard({
                           <RotateCw className={`h-3.5 w-3.5 ${
                             chosenMode === 'simulator' ? 'text-red-500' : chosenMode === 'residents' ? 'text-slate-400' : 'text-teal-500'
                           }`} />
-                          <span>შეცდომების გავლა ({mistakesCountSoFar})</span>
+                          <span>შეცდომების გავლა ახლავე</span>
                         </button>
                       )}
                     </div>
@@ -665,10 +665,7 @@ export default function QuestionCard({
 
       {/* Pause/Branch into Interim Mistakes Mode */}
       {mistakesCountSoFar > 0 && !isMistakesSession && onPracticeMistakesNow && (
-        <div className="bg-slate-50 dark:bg-[#161B22] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex items-center justify-between gap-3 animate-fade-in shadow-sm">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-sans font-medium">
-            ნახეთ შეცდომები? შეგიძლიათ ნებისმიერ დროს გაიაროთ ისინი ახლავე, ძირითადი ტესტის პაუზით.
-          </div>
+        <div className="flex justify-end animate-fade-in">
           <button
             onClick={onPracticeMistakesNow}
             className={`px-3 py-2 text-xs font-bold rounded-lg shrink-0 flex items-center gap-1.5 focus:outline-none transition-all border ${
@@ -680,7 +677,7 @@ export default function QuestionCard({
             }`}
           >
             <RotateCw className="h-3.5 w-3.5" />
-            შეცდომების გავლა ახლავე ({mistakesCountSoFar})
+            შეცდომების გავლა ახლავე
           </button>
         </div>
       )}

@@ -60,13 +60,11 @@ export function preprocessMessyFormat(raw: string): string {
     if (!questionText) continue;
     if (options.length === 0) continue;
 
-    const correctOpt = options.find((o) => o.correct);
-    const incorrectOpts = options.filter((o) => !o.correct);
-
+    // Output options in the exact order they appeared in the source block,
+    // using // for correct and /// for incorrect — this preserves file order.
     let blockOut = `//// ${questionText}`;
-    if (correctOpt) blockOut += `\n// ${correctOpt.text}`;
-    incorrectOpts.forEach((o) => {
-      blockOut += `\n/// ${o.text}`;
+    options.forEach((o) => {
+      blockOut += o.correct ? `\n// ${o.text}` : `\n/// ${o.text}`;
     });
 
     output.push(blockOut);
@@ -159,46 +157,43 @@ export function parseUploadedQuizText(
 export function parseQuestionFile(text: string, fileName: string): RawQuestion[] {
   const lines = text.split(/\r?\n/);
   const questions: RawQuestion[] = [];
-  let currentQuestion: Partial<RawQuestion> | null = null;
+  let currentQuestion: Partial<RawQuestion> & { optionsInFileOrder: string[] } | null = null;
   let originalIdx = 1;
+
+  const saveQuestion = () => {
+    if (currentQuestion && currentQuestion.text && (currentQuestion.correctAnswer || currentQuestion.incorrectAnswers?.length)) {
+      questions.push({
+        id: `${fileName}-${originalIdx}-${Math.random().toString(36).substring(2, 9)}`,
+        text: currentQuestion.text,
+        correctAnswer: currentQuestion.correctAnswer || '',
+        incorrectAnswers: currentQuestion.incorrectAnswers || [],
+        optionsInFileOrder: currentQuestion.optionsInFileOrder || [],
+        sourceFile: fileName,
+        originalIndex: originalIdx++,
+      } as RawQuestion);
+    }
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
     if (line.startsWith('////')) {
-      // Save previous question if valid
-      if (currentQuestion && currentQuestion.text && (currentQuestion.correctAnswer || currentQuestion.incorrectAnswers?.length)) {
-        questions.push({
-          id: `${fileName}-${originalIdx}-${Math.random().toString(36).substring(2, 9)}`,
-          text: currentQuestion.text,
-          correctAnswer: currentQuestion.correctAnswer || '',
-          incorrectAnswers: currentQuestion.incorrectAnswers || [],
-          sourceFile: fileName,
-          originalIndex: originalIdx++,
-        } as RawQuestion);
-      }
-      
-      currentQuestion = {
-        text: line.substring(4).trim(),
-        incorrectAnswers: [],
-      };
+      saveQuestion();
+      currentQuestion = { text: line.substring(4).trim(), incorrectAnswers: [], optionsInFileOrder: [] };
     } else if (line.startsWith('///')) {
-      if (!currentQuestion) {
-        currentQuestion = { text: 'უტექსტო კითხვა', incorrectAnswers: [] };
-      }
-      currentQuestion.incorrectAnswers?.push(line.substring(3).trim());
+      if (!currentQuestion) currentQuestion = { text: 'უტექსტო კითხვა', incorrectAnswers: [], optionsInFileOrder: [] };
+      const opt = line.substring(3).trim();
+      currentQuestion.incorrectAnswers?.push(opt);
+      currentQuestion.optionsInFileOrder.push(opt);
     } else if (line.startsWith('//') && !line.startsWith('///') && !line.startsWith('////')) {
-      if (!currentQuestion) {
-        currentQuestion = { text: 'უტექსტო კითხვა', incorrectAnswers: [] };
-      }
+      if (!currentQuestion) currentQuestion = { text: 'უტექსტო კითხვა', incorrectAnswers: [], optionsInFileOrder: [] };
       let ans = line.substring(2).trim();
-      // Strip leading checkmarks/emojis of correct answer indicator
       ans = ans.replace(/^[❌✅☑️✔️✓✔☑\u2714\u2611\u2705]\s*/g, '').trim();
-      ans = ans.replace(/^️\s*/g, '').trim(); // Remove specific variation selectors if any
+      ans = ans.replace(/^️\s*/g, '').trim();
       currentQuestion.correctAnswer = ans;
+      currentQuestion.optionsInFileOrder.push(ans);
     } else {
-      // Append text block to question text
       if (currentQuestion) {
         if (!currentQuestion.correctAnswer && (!currentQuestion.incorrectAnswers || currentQuestion.incorrectAnswers.length === 0)) {
           currentQuestion.text = (currentQuestion.text ? currentQuestion.text + '\n' : '') + line;
@@ -207,18 +202,7 @@ export function parseQuestionFile(text: string, fileName: string): RawQuestion[]
     }
   }
 
-  // Save the last question
-  if (currentQuestion && currentQuestion.text && (currentQuestion.correctAnswer || currentQuestion.incorrectAnswers?.length)) {
-    questions.push({
-      id: `${fileName}-${originalIdx}-${Math.random().toString(36).substring(2, 9)}`,
-      text: currentQuestion.text,
-      correctAnswer: currentQuestion.correctAnswer || '',
-      incorrectAnswers: currentQuestion.incorrectAnswers || [],
-      sourceFile: fileName,
-      originalIndex: originalIdx,
-    } as RawQuestion);
-  }
-
+  saveQuestion();
   return questions;
 }
 
@@ -252,7 +236,12 @@ export function prepareSessionQuestions(
 
   return list.map((q) => {
     const rawOptions = [q.correctAnswer, ...q.incorrectAnswers].filter(Boolean);
-    const options = shuffleOptions ? shuffleArray(rawOptions) : [...rawOptions];
+    // When shuffle is off, show options exactly as they appeared in the uploaded file.
+    // Fall back to rawOptions only if optionsInFileOrder is missing (e.g. legacy data).
+    const fileOrder = q.optionsInFileOrder?.length === rawOptions.length
+      ? q.optionsInFileOrder
+      : rawOptions;
+    const options = shuffleOptions ? shuffleArray(rawOptions) : [...fileOrder];
     return {
       id: q.id,
       text: q.text,

@@ -3,6 +3,7 @@
   text: string;
   correctAnswer: string;
   incorrectAnswers: string[];
+  optionsInFileOrder?: string[]; // Options exactly as they appear in the source file (absent for legacy/built-in data)
   sourceFile: string;
   originalIndex: number; // 1-based index in the original file
 }

@@ -85,7 +85,9 @@ export default function QuestionCard({
     setLocalCutEnd(cutEnd || '');
   }, [rangeStart, rangeEnd, cutStart, cutEnd]);
 
-  const optionsToDisplay = shuffleOptions ? question.options : (question.rawOptions || question.options);
+  // `question.options` is authoritative: it holds file-order when shuffleOptions=false,
+  // or a shuffled order when shuffleOptions=true. Never fall back to rawOptions for display.
+  const optionsToDisplay = question.options;
 
   // Compute categories and counts for Table of Contents
   const categoriesWithCounts = useMemo(() => {

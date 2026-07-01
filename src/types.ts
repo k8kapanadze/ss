@@ -12,8 +12,7 @@ export interface PlayableQuestion {
   id: string;
   text: string;
   correctAnswer: string;
-  options: string[]; // Shuffled incorrect + correct options
-  rawOptions: string[]; // Unshuffled [correctAnswer, ...incorrectAnswers] options
+  options: string[]; // Display order: file-order when shuffle=OFF, randomised when shuffle=ON
   originalIndex: number;
   sourceFile: string;
   flagged?: boolean;

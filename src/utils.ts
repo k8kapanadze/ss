@@ -247,7 +247,6 @@ export function prepareSessionQuestions(
       text: q.text,
       correctAnswer: q.correctAnswer,
       options,
-      rawOptions,
       originalIndex: q.originalIndex,
       sourceFile: q.sourceFile,
     };
